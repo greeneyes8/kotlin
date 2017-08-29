@@ -412,63 +412,71 @@ class KotlinInjectionTest : AbstractInjectionTest() {
             )
     )
 
-    fun testInjectionInJavaAnnotation() {
+    fun testInjectionInJavaAnnotation() =
+            doAnnotationInjectionTest(
+                    """psiMethod().withName("value").withParameters().definedInClass("InHtml")""",
+                    """
+                @InHtml("<htm<caret>l></html>")
+                fun foo() {
+                }
+                """,
+                    """
+                @interface InHtml {
+                    String value();
+                }
+                """,
+                    { assertSameElements(myFixture.complete(CompletionType.BASIC).flatMap { it.allLookupStrings }, "html") }
+            )
+
+    fun testInjectionInJavaAnnotationWithNamedParam() =
+            doAnnotationInjectionTest(
+                    """psiMethod().withName("html").withParameters().definedInClass("InHtml")""",
+                    """
+                            @InHtml(html = "<htm<caret>l></html>")
+                            fun foo() {
+                            }
+                            """,
+                    """
+                            @interface InHtml {
+                            String html();
+                            }
+                            """
+            )
+
+    fun testInjectionInAliasedJavaAnnotation() =
+            doAnnotationInjectionTest(
+                    """psiMethod().withName("html").withParameters().definedInClass("InHtml")""",
+                    """
+                            import InHtml as InHtmlAliased
+
+                            @InHtmlAliased(html = "<htm<caret>l></html>")
+                            fun foo() {
+                            }
+                            """,
+                    """
+                            @interface InHtml {
+                            String html();
+                            }
+                            """
+            )
+
+    private fun doAnnotationInjectionTest(pattern: String, kotlinCode: String, javaCode: String, additionalAsserts: () -> Unit = {}) {
         val customInjection = BaseInjection("java")
         customInjection.injectedLanguageId = HTMLLanguage.INSTANCE.id
         val elementPattern = customInjection.compiler.createElementPattern(
-                """psiMethod().withName("value").withParameters().definedInClass("InHtml")""",
-                "SuppressWarnings temp rule")
+                pattern,
+                "temp rule")
         customInjection.setInjectionPlaces(InjectionPlace(elementPattern, true))
 
         try {
             Configuration.getInstance().replaceInjections(listOf(customInjection), listOf(), true)
 
             doInjectionPresentTest(
-                    """
-                      @InHtml("<htm<caret>l></html>")
-                      fun foo() {
-                      }
-                    """, """
-                    @interface InHtml {
-                        String value();
-                    }
-                    """.trimIndent(),
+                    kotlinCode, javaCode.trimIndent(),
                     HTMLLanguage.INSTANCE.id,
                     unInjectShouldBePresent = false
             )
-
-            assertSameElements(myFixture.complete(CompletionType.BASIC).flatMap { it.allLookupStrings },
-                               "html")
-        }
-        finally {
-            Configuration.getInstance().replaceInjections(listOf(), listOf(customInjection), true)
-        }
-    }
-
-    fun testInjectionInJavaAnnotationWithNamedParam() {
-        val customInjection = BaseInjection("java")
-        customInjection.injectedLanguageId = HTMLLanguage.INSTANCE.id
-        val elementPattern = customInjection.compiler.createElementPattern(
-                """psiMethod().withName("html").withParameters().definedInClass("InHtml")""",
-                "SuppressWarnings temp rule")
-        customInjection.setInjectionPlaces(InjectionPlace(elementPattern, true))
-
-        try {
-            Configuration.getInstance().replaceInjections(listOf(customInjection), listOf(), true)
-
-            doInjectionPresentTest(
-                    """
-                      @InHtml(html = "<htm<caret>l></html>")
-                      fun foo() {
-                      }
-                    """, """
-                    @interface InHtml {
-                        String html();
-                    }
-                    """.trimIndent(),
-                    HTMLLanguage.INSTANCE.id,
-                    unInjectShouldBePresent = false
-            )
+            additionalAsserts()
         }
         finally {
             Configuration.getInstance().replaceInjections(listOf(), listOf(customInjection), true)

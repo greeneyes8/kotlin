@@ -23,16 +23,21 @@ import com.intellij.openapi.application.ApplicationManager
 import com.intellij.openapi.progress.ProgressManager
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.util.Key
+import com.intellij.openapi.util.text.StringUtilRt
+import com.intellij.patterns.PatternConditionPlus
 import com.intellij.psi.*
 import com.intellij.psi.impl.source.tree.injected.InjectedLanguageUtil
 import com.intellij.psi.search.LocalSearchScope
 import com.intellij.psi.search.searches.ReferencesSearch
+import com.intellij.psi.util.CachedValueProvider
+import com.intellij.psi.util.CachedValuesManager
 import com.intellij.psi.util.PsiTreeUtil
 import org.intellij.plugins.intelliLang.Configuration
 import org.intellij.plugins.intelliLang.inject.InjectorUtils
 import org.intellij.plugins.intelliLang.inject.LanguageInjectionSupport
 import org.intellij.plugins.intelliLang.inject.TemporaryPlacesRegistry
 import org.intellij.plugins.intelliLang.inject.config.BaseInjection
+import org.intellij.plugins.intelliLang.inject.config.InjectionPlace
 import org.intellij.plugins.intelliLang.inject.java.JavaLanguageInjectionSupport
 import org.intellij.plugins.intelliLang.util.AnnotationUtilEx
 import org.jetbrains.kotlin.descriptors.DeclarationDescriptorWithSource
@@ -47,8 +52,7 @@ import org.jetbrains.kotlin.resolve.annotations.argumentValue
 import org.jetbrains.kotlin.resolve.calls.callUtil.getResolvedCall
 import org.jetbrains.kotlin.resolve.lazy.BodyResolveMode
 import org.jetbrains.kotlin.resolve.source.getPsi
-import java.util.*
-import kotlin.collections.ArrayList
+import org.jetbrains.kotlin.util.aliasImportMap
 
 class KotlinLanguageInjector(
         val configuration: Configuration,
@@ -254,6 +258,7 @@ class KotlinLanguageInjector(
     private fun injectInAnnotationCall(host: KtElement): InjectionInfo? {
         val argument = host.parent as? KtValueArgument ?: return null
         val annotationEntry = argument.parent.parent as? KtAnnotationEntry ?: return null
+        if (!fastCheckInjectionsExists(annotationEntry)) return null
         val callDescriptor = annotationEntry.getResolvedCall(annotationEntry.analyze())?.candidateDescriptor
         val psiClass = (callDescriptor as? DeclarationDescriptorWithSource)?.source?.getPsi() as? PsiClass ?: return null
         val argumentName = argument.getArgumentName()?.asName?.identifier ?: "value"
@@ -343,5 +348,31 @@ class KotlinLanguageInjector(
         val suffix = AnnotationUtilEx.calcAnnotationValue(annotations, "suffix")
 
         return InjectionInfo(id, prefix, suffix)
+    }
+
+    private val injectableTargetClassShortNames = CachedValuesManager.getManager(project)
+            .createCachedValue({
+                                   val injectableTargets =
+                                           configuration.getInjections(JavaLanguageInjectionSupport.JAVA_SUPPORT_ID)
+                                                   .flatMapTo(HashSet()) { it.injectionPlaces.mapNotNull { retrievePlaceTargetClass(it) } }
+                                   CachedValueProvider.Result.create(injectableTargets, configuration)
+                               }, false)
+
+    private fun fastCheckInjectionsExists(annotationEntry: KtAnnotationEntry): Boolean {
+        val annotationShortName = (annotationEntry.typeReference?.typeElement as? KtUserType)?.run {
+            annotationEntry.containingKtFile.aliasImportMap()[referencedName].singleOrNull() ?: referencedName
+        } ?: return false
+        return annotationShortName in injectableTargetClassShortNames.value
+    }
+
+    private fun retrievePlaceTargetClass(place: InjectionPlace): String? {
+        val classCondition = place.elementPattern.condition.conditions.firstOrNull { it.debugMethodName == "definedInClass" } as? PatternConditionPlus<*, *> ?: return null
+        val qNamePattern = classCondition.valuePattern.condition.conditions.firstOrNull { it.debugMethodName == "withQualifiedName" } ?: return null
+        return qNamePattern.run {
+            StringUtilRt.getShortName(javaClass.declaredFields.first { it.name.endsWith("qname") }
+                                              .apply { isAccessible = true }
+                                              .get(this) as String)
+        }
+
     }
 }
