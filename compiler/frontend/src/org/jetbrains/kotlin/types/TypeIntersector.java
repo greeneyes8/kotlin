@@ -40,6 +40,32 @@ public class TypeIntersector {
         return intersectTypes(new LinkedHashSet<>(Arrays.asList(typeA, typeB))) == null;
     }
 
+    private static boolean isTypePopulated(@NotNull KotlinType type) {
+        if (!(type.getConstructor() instanceof IntersectionTypeConstructor)) {
+            return !KotlinBuiltIns.isNothing(type);
+        }
+
+        Collection<KotlinType> typesInIntersection = type.getConstructor().getSupertypes();
+
+        KotlinTypeChecker typeChecker = KotlinTypeChecker.DEFAULT;
+        for (KotlinType lower : typesInIntersection) {
+            if (TypeUtils.canHaveSubtypes(typeChecker, lower)) {
+                continue;
+            }
+
+            if (KotlinBuiltIns.isNothing(lower)) return false;
+
+            for (KotlinType upper : typesInIntersection) {
+                boolean mayBeEqual = TypeUnifier.mayBeEqual(lower, upper);
+                if (!mayBeEqual && !typeChecker.isSubtypeOf(lower, upper) && !typeChecker.isSubtypeOf(lower, upper)) {
+                    return false;
+                }
+            }
+        }
+
+        return true;
+    }
+
     @Nullable
     public static KotlinType intersectTypes(@NotNull Collection<KotlinType> types) {
         assert !types.isEmpty() : "Attempting to intersect empty collection of types, this case should be dealt with on the call site.";
