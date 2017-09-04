@@ -305,7 +305,7 @@ public class CommonSupertypes {
         if (ins != null) {
             assert !ins.isEmpty() : "In projections is empty for parameter " + parameterDescriptor + ", type projections " + typeProjections;
             KotlinType intersection = TypeIntersector.intersectTypes(ins);
-            if (intersection == null) {
+            if (!KotlinBuiltIns.isNothing(intersection) && !TypeIntersector.isTypePopulated(intersection)) {
                 return TypeUtils.makeStarProjection(parameterDescriptor);
             }
             Variance projectionKind = variance == IN_VARIANCE ? Variance.INVARIANT : IN_VARIANCE;
