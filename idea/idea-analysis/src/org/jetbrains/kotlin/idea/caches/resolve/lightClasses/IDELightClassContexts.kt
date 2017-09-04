@@ -129,12 +129,39 @@ object IDELightClassContexts {
         return IDELightClassConstructionContext(resolveSession.bindingContext, resolveSession.moduleDescriptor, EXACT)
     }
 
+    fun contextForScript(script: KtScript): LightClassConstructionContext {
+        val resolutionFacade = script.getResolutionFacade()
+        val bindingContext = resolutionFacade.analyze(script)
+        // TODO: ForceResolveUtil.forceResolveAllContents ??
+        return IDELightClassConstructionContext(bindingContext, resolutionFacade.moduleDescriptor, EXACT)
+    }
+
     fun lightContextForClassOrObject(classOrObject: KtClassOrObject): LightClassConstructionContext? {
         if (!isDummyResolveApplicable(classOrObject)) return null
 
         val resolveSession = setupAdHocResolve(classOrObject.project, classOrObject.getResolutionFacade().moduleDescriptor, listOf(classOrObject.containingKtFile))
 
         ForceResolveUtil.forceResolveAllContents(resolveSession.resolveToDescriptor(classOrObject))
+
+        return IDELightClassConstructionContext(resolveSession.bindingContext, resolveSession.moduleDescriptor, LIGHT)
+    }
+
+    fun lightContextForFacade(files: List<KtFile>): LightClassConstructionContext {
+        val representativeFile = files.first()
+        val resolveSession = setupAdHocResolve(representativeFile.project, representativeFile.getResolutionFacade().moduleDescriptor, files)
+
+        forceResolvePackageDeclarations(files, resolveSession)
+
+        return IDELightClassConstructionContext(resolveSession.bindingContext, resolveSession.moduleDescriptor, LIGHT)
+    }
+
+    fun lightContextForScript(script: KtScript): LightClassConstructionContext {
+        val resolveSession = setupAdHocResolve(
+                script.project,
+                script.getResolutionFacade().moduleDescriptor,
+                listOf(script.containingKtFile))
+
+        // TODO: ForceResolveUtil.forceResolveAllContents ??
 
         return IDELightClassConstructionContext(resolveSession.bindingContext, resolveSession.moduleDescriptor, LIGHT)
     }
@@ -191,15 +218,6 @@ object IDELightClassContexts {
             false // stop processing at first matching result
         }
         return result
-    }
-
-    fun lightContextForFacade(files: List<KtFile>): LightClassConstructionContext {
-        val representativeFile = files.first()
-        val resolveSession = setupAdHocResolve(representativeFile.project, representativeFile.getResolutionFacade().moduleDescriptor, files)
-
-        forceResolvePackageDeclarations(files, resolveSession)
-
-        return IDELightClassConstructionContext(resolveSession.bindingContext, resolveSession.moduleDescriptor, LIGHT)
     }
 
     fun forceResolvePackageDeclarations(files: Collection<KtFile>, session: ResolveSession) {

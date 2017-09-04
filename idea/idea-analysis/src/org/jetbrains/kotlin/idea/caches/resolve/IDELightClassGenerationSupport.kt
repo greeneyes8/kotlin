@@ -84,6 +84,14 @@ class IDELightClassGenerationSupport(private val project: Project) : LightClassG
         )
     }
 
+    override fun createDataHolderForScript(script: KtScript, builder: LightClassBuilder): LightClassDataHolder.ForScript {
+        return LazyLightClassDataHolder.ForScript(
+                builder,
+                exactContextProvider = { IDELightClassContexts.contextForScript(script) },
+                dummyContextProvider = { IDELightClassContexts.lightContextForScript(script) }
+        )
+    }
+
     override fun findClassOrObjectDeclarations(fqName: FqName, searchScope: GlobalSearchScope): Collection<KtClassOrObject> {
         return runReadAction {
             KotlinFullClassNameIndex.getInstance().get(fqName.asString(), project, sourceAndClassFiles(searchScope, project))
@@ -130,6 +138,8 @@ class IDELightClassGenerationSupport(private val project: Project) : LightClassG
         }
         return null
     }
+
+    override fun getLightClassForScript(script: KtScript): KtLightClassForScript? = KtLightClassForScript.create(script)
 
     private fun withFakeLightClasses(
             lightClassForFacade: KtLightClassForFacade?,
