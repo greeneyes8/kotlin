@@ -2782,6 +2782,12 @@ public class DiagnosticsUsingJavacTestGenerated extends AbstractDiagnosticsUsing
                 doTest(fileName);
             }
 
+            @TestMetadata("checkWithRawFlexibleSubjectType.kt")
+            public void testCheckWithRawFlexibleSubjectType() throws Exception {
+                String fileName = KotlinTestUtils.navigationMetadata("compiler/testData/diagnostics/tests/cast/checkWithRawFlexibleSubjectType.kt");
+                doTest(fileName);
+            }
+
             @TestMetadata("constants.kt")
             public void testConstants() throws Exception {
                 String fileName = KotlinTestUtils.navigationMetadata("compiler/testData/diagnostics/tests/cast/constants.kt");
