@@ -47,15 +47,15 @@ public class TypeIntersector {
     }
 
     public static boolean isTypePopulated(@NotNull KotlinType type) {
-        if (!(type.getConstructor() instanceof IntersectionTypeConstructor)) {
-            boolean isSimpleType = type.unwrap() instanceof SimpleType;
-            return !(isSimpleType && KotlinBuiltIns.isNothing(type));
-        }
-
         // For type (L..U) we should check if only U is actually populated, because L can be not populated.
         // The simplest such type is dynamic type
         if (FlexibleTypesKt.isFlexible(type)) {
             return isTypePopulated(FlexibleTypesKt.asFlexibleType(type).getUpperBound());
+        }
+
+        if (!(type.getConstructor() instanceof IntersectionTypeConstructor)) {
+            boolean isSimpleType = type.unwrap() instanceof SimpleType;
+            return !(isSimpleType && KotlinBuiltIns.isNothing(type));
         }
 
         Collection<KotlinType> typesInIntersection = type.getConstructor().getSupertypes();
