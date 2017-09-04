@@ -33,10 +33,7 @@ import org.jetbrains.kotlin.asJava.LightClassGenerationSupport;
 import org.jetbrains.kotlin.load.java.JvmAbi;
 import org.jetbrains.kotlin.name.FqName;
 import org.jetbrains.kotlin.name.FqNamesUtilKt;
-import org.jetbrains.kotlin.psi.KtClass;
-import org.jetbrains.kotlin.psi.KtClassOrObject;
-import org.jetbrains.kotlin.psi.KtEnumEntry;
-import org.jetbrains.kotlin.psi.KtFile;
+import org.jetbrains.kotlin.psi.*;
 import org.jetbrains.kotlin.resolve.jvm.KotlinFinderMarker;
 
 import java.util.Collection;
@@ -90,11 +87,25 @@ public class JavaElementFinder extends PsiElementFinder implements KotlinFinderM
         FqName qualifiedName = new FqName(qualifiedNameString);
 
         findClassesAndObjects(qualifiedName, scope, answer);
+        findScripts(qualifiedName, scope, answer);
 
         answer.addAll(lightClassGenerationSupport.getFacadeClasses(qualifiedName, scope));
         answer.addAll(lightClassGenerationSupport.getKotlinInternalClasses(qualifiedName, scope));
 
         return sortByClasspath(answer, scope).toArray(new PsiClass[answer.size()]);
+    }
+
+    private void findScripts(FqName qualifiedName, GlobalSearchScope scope, List<PsiClass> answer) {
+        Collection<KtFile> files = lightClassGenerationSupport.findFilesForPackage(qualifiedName.parent(), scope);
+        for (KtFile file : files) {
+            KtScript script = file.getScript();
+            if (script != null && qualifiedName.equals(script.getFqName())) {
+                PsiClass lightClass = toLightClass(script);
+                if (lightClass != null) {
+                    answer.add(lightClass);
+                }
+            }
+        }
     }
 
     // Finds explicitly declared classes and objects, not package classes

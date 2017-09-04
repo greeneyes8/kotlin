@@ -27,10 +27,7 @@ import org.jetbrains.kotlin.asJava.LightClassBuilder
 import org.jetbrains.kotlin.asJava.LightClassGenerationSupport
 import org.jetbrains.kotlin.asJava.builder.ClsWrapperStubPsiFactory
 import org.jetbrains.kotlin.asJava.builder.LightClassDataHolder
-import org.jetbrains.kotlin.asJava.classes.FakeLightClassForFileOfPackage
-import org.jetbrains.kotlin.asJava.classes.KtLightClass
-import org.jetbrains.kotlin.asJava.classes.KtLightClassForFacade
-import org.jetbrains.kotlin.asJava.classes.KtLightClassForSourceDeclaration
+import org.jetbrains.kotlin.asJava.classes.*
 import org.jetbrains.kotlin.asJava.finder.JavaElementFinder
 import org.jetbrains.kotlin.descriptors.DeclarationDescriptor
 import org.jetbrains.kotlin.fileClasses.JvmFileClassUtil
@@ -84,6 +81,14 @@ class IDELightClassGenerationSupport(private val project: Project) : LightClassG
         )
     }
 
+    override fun createDataHolderForScript(script: KtScript, builder: LightClassBuilder): LightClassDataHolder.ForScript {
+        return LazyLightClassDataHolder.ForScript(
+                builder,
+                exactContextProvider = { IDELightClassContexts.contextForScript(script) },
+                dummyContextProvider = { IDELightClassContexts.lightContextForScript(script) }
+        )
+    }
+
     override fun findClassOrObjectDeclarations(fqName: FqName, searchScope: GlobalSearchScope): Collection<KtClassOrObject> {
         return runReadAction {
             KotlinFullClassNameIndex.getInstance().get(fqName.asString(), project, sourceAndClassFiles(searchScope, project))
@@ -130,6 +135,8 @@ class IDELightClassGenerationSupport(private val project: Project) : LightClassG
         }
         return null
     }
+
+    override fun getLightClassForScript(script: KtScript): KtLightClassForScript? = KtLightClassForScript.create(script)
 
     private fun withFakeLightClasses(
             lightClassForFacade: KtLightClassForFacade?,

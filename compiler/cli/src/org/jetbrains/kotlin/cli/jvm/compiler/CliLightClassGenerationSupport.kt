@@ -30,6 +30,7 @@ import org.jetbrains.kotlin.asJava.LightClassGenerationSupport
 import org.jetbrains.kotlin.asJava.builder.*
 import org.jetbrains.kotlin.asJava.classes.KtLightClass
 import org.jetbrains.kotlin.asJava.classes.KtLightClassForFacade
+import org.jetbrains.kotlin.asJava.classes.KtLightClassForScript
 import org.jetbrains.kotlin.asJava.classes.KtLightClassForSourceDeclaration
 import org.jetbrains.kotlin.descriptors.DeclarationDescriptor
 import org.jetbrains.kotlin.descriptors.ModuleDescriptor
@@ -92,9 +93,17 @@ class CliLightClassGenerationSupport(project: Project) : LightClassGenerationSup
         )
     }
 
-    private fun getContext(): LightClassConstructionContext {
-        return LightClassConstructionContext(bindingContext, module)
+    override fun createDataHolderForFacade(files: Collection<KtFile>, builder: LightClassBuilder): LightClassDataHolder.ForFacade {
+        val (stub, _, diagnostics) = builder(getContext())
+        return LightClassDataHolderImpl(stub, diagnostics)
     }
+
+    override fun createDataHolderForScript(script: KtScript, builder: LightClassBuilder): LightClassDataHolder.ForScript {
+        val (stub, _, diagnostics) = builder(getContext())
+        return LightClassDataHolderImpl(stub, diagnostics)
+    }
+
+    private fun getContext(): LightClassConstructionContext = LightClassConstructionContext(bindingContext, module)
 
     override fun findClassOrObjectDeclarations(fqName: FqName, searchScope: GlobalSearchScope): Collection<KtClassOrObject> {
         return ResolveSessionUtils.getClassDescriptorsByFqName(module, fqName).mapNotNull {
@@ -143,9 +152,9 @@ class CliLightClassGenerationSupport(project: Project) : LightClassGenerationSup
         })
     }
 
-    override fun getLightClass(classOrObject: KtClassOrObject): KtLightClass? {
-        return KtLightClassForSourceDeclaration.create(classOrObject)
-    }
+    override fun getLightClass(classOrObject: KtClassOrObject): KtLightClass? = KtLightClassForSourceDeclaration.create(classOrObject)
+
+    override fun getLightClassForScript(script: KtScript): KtLightClassForScript? = KtLightClassForScript.create(script)
 
     override fun resolveToDescriptor(declaration: KtDeclaration): DeclarationDescriptor? {
         return bindingContext.get(BindingContext.DECLARATION_TO_DESCRIPTOR, declaration)
@@ -174,11 +183,6 @@ class CliLightClassGenerationSupport(project: Project) : LightClassGenerationSup
         return PackagePartClassUtils.getFilesWithCallables(findFilesForPackage(facadeFqName.parent(), scope)).filter {
             JvmFileClassUtil.getFileClassInfoNoResolve(it).facadeClassFqName == facadeFqName
         }
-    }
-
-    override fun createDataHolderForFacade(files: Collection<KtFile>, builder: LightClassBuilder): LightClassDataHolder.ForFacade {
-        val (stub, _, diagnostics) = builder(getContext())
-        return LightClassDataHolderImpl(stub, diagnostics)
     }
 
     override fun createTrace(): BindingTraceContext {
